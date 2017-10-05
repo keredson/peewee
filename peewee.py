@@ -4170,21 +4170,20 @@ class PostgresqlDatabase(Database):
 
     def get_indexes(self, table, schema='public'):
         query = """
-            SELECT
-                i.relname, idxs.indexdef, idx.indisunique,
-                array_to_string(array_agg(cols.attname), ',')
-            FROM pg_catalog.pg_class AS t
-            INNER JOIN pg_catalog.pg_index AS idx ON t.oid = idx.indrelid
-            INNER JOIN pg_catalog.pg_class AS i ON idx.indexrelid = i.oid
-            INNER JOIN pg_catalog.pg_indexes AS idxs ON
-                (idxs.tablename = t.relname AND idxs.indexname = i.relname)
-            LEFT OUTER JOIN pg_catalog.pg_attribute AS cols ON
-                (cols.attrelid = t.oid AND cols.attnum = ANY(idx.indkey))
-            WHERE t.relname = %s AND t.relkind = %s AND idxs.schemaname = %s
-            GROUP BY i.relname, idxs.indexdef, idx.indisunique
-            ORDER BY idx.indisunique DESC, i.relname;"""
+select index_class.relname,
+       idxs.indexdef,
+       array_agg(table_attribute.attname order by array_position(index.indkey, table_attribute.attnum)),
+       index.indisunique,
+       table_class.relname
+from pg_catalog.pg_class index_class
+     join pg_catalog.pg_index index on index_class.oid = index.indexrelid
+     join pg_catalog.pg_class table_class on table_class.oid = index.indrelid
+     join pg_catalog.pg_attribute table_attribute on table_class.oid = table_attribute.attrelid and table_attribute.attnum = any(index.indkey)
+     join pg_catalog.pg_indexes idxs on idxs.tablename = table_class.relname and idxs.indexname = index_class.relname
+where table_class.relname = %s and table_class.relkind = %s and idxs.schemaname = %s
+group by index_class.relname, idxs.indexdef, index.indisunique, table_class.relname;"""
         cursor = self.execute_sql(query, (table, 'r', schema))
-        return [IndexMetadata(row[0], row[1], row[3].split(','), row[2], table)
+        return [IndexMetadata(*row)
                 for row in cursor.fetchall()]
 
     def get_columns(self, table, schema='public'):
