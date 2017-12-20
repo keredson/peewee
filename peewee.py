@@ -44,7 +44,7 @@ from inspect import isclass
 
 
 __peewee_version__ = '2.8.5'
-__herman_version__ = '1.2.4'
+__herman_version__ = '1.2.5'
 __version__ = __peewee_version__
 
 
